@@ -56,7 +56,14 @@ h2{font-family:var(--head);font-weight:400;font-size:28px;line-height:1.15;margi
 .msg.bad{background:var(--bad-t)}
 .msg.good{background:var(--good-t)}
 .msg:empty{display:none}
+[hidden]{display:none!important}
 .menu{display:flex;flex-direction:column;gap:12px}
+.who{display:grid;grid-template-columns:1fr 1fr;border:1.5px solid var(--line);border-radius:10px;overflow:hidden;margin:0 0 22px}
+.who button{min-height:50px;border:0;background:var(--raised);color:var(--ink);font-size:16px;cursor:pointer}
+.who button + button{border-left:1.5px solid var(--line)}
+.who button[aria-pressed=true]{background:var(--accent);color:var(--on);font-weight:600}
+.lv{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+.endre{margin-top:22px}
 .menu .btn{min-height:72px;font-size:19px;justify-content:flex-start;padding:0 20px}
 .menu .btn small{display:block;font-size:14px;font-weight:400;opacity:.8}
 .menu .btn span{display:block;text-align:left}
@@ -129,8 +136,9 @@ h2{font-family:var(--head);font-weight:400;font-size:28px;line-height:1.15;margi
 
 <section class="pane on" id="pLogin">
   <div class="brand"><span class="ey">St. Andrew's Junior College</span><span class="nm">SAJC Discipline Committee</span></div>
-  <h1>Teachers</h1>
-  <p class="lede">Grooming checks and logging an offence.</p>
+  <div class="who" role="group" aria-label="Signing in as"><button type="button" id="roleT" aria-pressed="true" onclick="setRole('teacher')">Teachers</button><button type="button" id="roleD" aria-pressed="false" onclick="setRole('dc')">Disc. comm</button></div>
+  <h1 id="loginH">Teachers</h1>
+  <p class="lede" id="loginL">Grooming checks and logging an offence.</p>
   <div class="msg" id="mLogin"></div>
   <div class="field"><label for="pw">Password</label><div class="pwbox"><input id="pw" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"><button type="button" class="eye" id="eye" aria-label="Show password" aria-pressed="false" onclick="togglePw()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path class="slash" d="M4 4l16 16"/></svg></button></div></div>
   <button class="btn" id="btnLogin" onclick="doLogin()">Sign in</button>
@@ -190,8 +198,9 @@ h2{font-family:var(--head);font-weight:400;font-size:28px;line-height:1.15;margi
   <p class="state" id="reState"></p>
   <div class="msg" id="mRe"></div>
   <div class="search"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><input id="reQ" placeholder="Search" aria-label="Search for a student" oninput="paintRecheck()" autocomplete="off"></div>
+  <div id="reStart"></div>
   <div id="reList" style="margin-top:6px"></div>
-  <p class="note" style="margin-top:16px">Ending the recheck (everyone left becomes "did not report") is done in the Discipline app.</p>
+  <div class="endre" id="reEnd" hidden><button class="btn quiet" onclick="endRecheck()">End this recheck</button><p class="note" style="margin-top:8px">Everyone not marked by then becomes "did not report" (the Discipline app sorts out who was absent or late).</p></div>
 </section>
 
 <section class="pane" id="pDone">
@@ -261,11 +270,19 @@ function goBack() {
 }
 
 /* ---------- sign in, who you are ---------- */
+var loginRole = LS.get('tch.loginRole', 'teacher');
+function setRole(r) {
+  loginRole = r; LS.set('tch.loginRole', r);
+  $('roleT').setAttribute('aria-pressed', r === 'teacher'); $('roleD').setAttribute('aria-pressed', r === 'dc');
+  $('loginH').textContent = r === 'dc' ? 'Discipline committee' : 'Teachers';
+  $('loginL').textContent = r === 'dc' ? 'Grooming checks, offences and rechecks.' : 'Grooming checks and logging an offence.';
+  $('pw').placeholder = r === 'dc' ? 'Committee password' : 'Teachers\' password'; say('mLogin', '');
+}
 function doLogin() {
   if (!API) return say('mLogin', 'This page has not been connected to the Google script yet.', 'bad');
   var pw = $('pw').value; if (!pw) return;
   $('btnLogin').disabled = true; say('mLogin', '');
-  send('login', { role: 'teacher', password: pw }).then(function (j) {
+  send('login', { role: loginRole, password: pw }).then(function (j) {
     $('btnLogin').disabled = false;
     if (!j.ok) return say('mLogin', j.error, 'bad');
     S.token = j.token; S.role = j.role; S.names = j.names || []; S.lists = j.lists || {};
@@ -378,6 +395,7 @@ function submitCheck() {
     $('doneHead').textContent = 'Submitted';
     facts([['Class', cls], ['Date', dayShort(j.date || today())], ['Submitted by', S.me], ['Students flagged', String(j.flagged)]].concat(j.absent ? [['Of whom absent', String(j.absent)]] : []));
     $('doneTip').textContent = 'Made a mistake? Open the class again and change it there, then submit again.';
+    $('doneAgain').hidden = false;
     $('doneAgain').textContent = 'Check another class'; $('doneAgain').onclick = function () { show('pCheck'); var o = $('cls'); if (o.selectedIndex < o.options.length - 1) o.selectedIndex++; loadClass(); };
     show('pDone');
   }, function () { $('btnSubmit').disabled = false; paintClass(); say('mCheck', 'Could not reach the committee\'s sheet. Your marks are kept on this phone; press Submit again in a moment.', 'bad'); });
@@ -416,18 +434,23 @@ function saveOffence() {
   if (!S.type) return say('mOff', 'Choose what happened.', 'bad');
   if (g && !S.codes.length) return say('mOff', 'Choose at least one grooming or attire item.', 'bad');
   if (((t && t.remark) || (g && S.codes.indexOf(othersCode()) >= 0)) && !rem) return say('mOff', 'This one needs a remark.', 'bad');
-  var id = uid(), what = g ? S.codes.map(catName).join(', ') : t.label;
+  /* Pressing Log it again after "no signal" reuses the same ID, so if the first one did reach the sheet it is not counted twice. */
+  var sig = [n[0], S.type, S.codes.slice().sort().join(','), rem, $('offDate').value].join('|');
+  if (!S.pendOff || S.pendOff.sig !== sig) S.pendOff = { sig: sig, id: uid() };
+  var id = S.pendOff.id, what = g ? S.codes.map(catName).join(', ') : t.label;
   $('btnOff').disabled = true; say('mOff', '');
   send('offence', { id: id, sid: n[0], cls: n[2], date: $('offDate').value, teacher: S.me, device: device, kind: g ? 'groom' : 'offence', code: g ? '' : S.type, codes: g ? S.codes : [], remark: rem }).then(function (j) {
     $('btnOff').disabled = false;
     if (!j.ok) return say('mOff', j.error, 'bad');
+    S.pendOff = null;
     var L = LS.get('tch.logged', []).filter(function (x) { return x.at.slice(0, 10) === today(); }); L.push({ id: id, name: n[1], cls: n[2], what: what, at: new Date().toISOString() }); LS.set('tch.logged', L);
     $('doneHead').textContent = 'Logged';
     facts([['Student', n[1]], ['Class', n[2]], ['Offence', what], ['Date', dayShort($('offDate').value)], ['Logged by', S.me]]);
     $('doneTip').textContent = 'Made a mistake? Undo it from the first screen within 15 minutes. After that, tell the discipline committee.';
+    $('doneAgain').hidden = false;
     $('doneAgain').textContent = 'Log another'; $('doneAgain').onclick = openFind;
     show('pDone');
-  }, function () { $('btnOff').disabled = false; say('mOff', 'Could not reach the committee\'s sheet. Nothing was sent; press Log it again in a moment.', 'bad'); });
+  }, function () { $('btnOff').disabled = false; say('mOff', 'No answer from the committee\'s sheet, so it may not have arrived. Press Log it again when you have signal — it will not be counted twice.', 'bad'); });
 }
 function undoOffence(id) {
   if (!confirm('Undo this?')) return;
@@ -439,22 +462,42 @@ function undoOffence(id) {
 
 /* ---------- recheck (discipline committee) ---------- */
 function openRecheck() { $('reQ').value = ''; show('pRecheck'); loadRecheck(); }
-function loadRecheck() {
+function loadRecheck(why) {
   $('reState').textContent = 'Loading…'; say('mRe', '');
   send('recheckList', {}).then(function (j) {
     if (!j.ok) { $('reState').textContent = ''; return say('mRe', j.error, 'bad'); }
-    S.re = j; paintRecheck();
+    S.re = j; paintRecheck(); if (why) say('mRe', why, 'bad');
   }, function () { $('reState').textContent = ''; say('mRe', 'No signal.', 'bad'); });
 }
 function paintRecheck() {
   var R = S.re; if (!R) return;
-  if (!R.open) { $('reState').textContent = ''; $('reList').innerHTML = ''; return say('mRe', 'No recheck is open today. Start one in the Discipline app (Grooming › Start a recheck) and it appears here.'); }
+  $('reStart').innerHTML = ''; $('reEnd').hidden = !R.open;
+  if (!R.open) {
+    $('reState').textContent = ''; $('reList').innerHTML = ''; $('reQ').parentNode.hidden = true;
+    if (R.ended) return say('mRe', 'Today\'s recheck has been ended. Its marks are with the discipline committee.');
+    if (!R.canStart) return say('mRe', 'No recheck is open today. Start one in the Discipline app (Grooming › Start a recheck), or turn on starting rechecks from phones there (Settings › Data from Google).');
+    var lv = Object.keys(R.levels || {}).sort(), all = 0; lv.forEach(function (k) { all += R.levels[k]; });
+    say('mRe', '');
+    $('reStart').innerHTML = '<p class="lede">No recheck is open today. Who is it for?</p><div class="lv">' +
+      lv.map(function (k) { return '<button class="btn quiet" data-lv="' + esc(k) + '">' + esc(k) + ' · ' + R.levels[k] + ' student' + (R.levels[k] === 1 ? '' : 's') + '</button>'; }).join('') +
+      (lv.length > 1 ? '<button class="btn quiet" data-lv="All">Everyone · ' + all + ' students</button>' : '') + '</div>';
+    $('reStart').querySelectorAll('[data-lv]').forEach(function (b) { b.onclick = function () {
+      $('reStart').querySelectorAll('button').forEach(function (x) { x.disabled = true; });
+      send('startRecheck', { level: b.dataset.lv, teacher: S.me }).then(function (j) {
+        if (!j.ok) { say('mRe', j.error, 'bad'); return loadRecheck(); }
+        S.re = j; paintRecheck();
+      }, function () { say('mRe', 'No signal. Try again when you are connected.', 'bad'); loadRecheck(); });
+    }; });
+    return;
+  }
+  $('reQ').parentNode.hidden = false;
   var mark = {}; R.marks.forEach(function (m) { mark[m.sid + '|' + m.code] = m; });
   var by = {}; R.items.forEach(function (i) { (by[i.sid] = by[i.sid] || []).push(i); });
   var q = $('reQ').value.trim().toUpperCase(), sids = Object.keys(by).filter(function (sid) { var n = byId(sid); return n && (!q || (n[1] + ' ' + n[2]).toUpperCase().indexOf(q) >= 0); })
     .sort(function (a, b) { var x = byId(a), y = byId(b); return x[2] < y[2] ? -1 : x[2] > y[2] ? 1 : (+x[3] || 0) - (+y[3] || 0); });
   var seen = Object.keys(by).filter(function (sid) { return by[sid].every(function (i) { return mark[sid + '|' + i.code]; }); }).length;
-  $('reState').textContent = dayShort(R.date) + (R.level && R.level !== 'All' ? ' · ' + R.level : '') + ' · seen ' + seen + ' of ' + Object.keys(by).length;
+  $('reState').textContent = dayShort(R.date) + (R.level && R.level !== 'All' ? ' · ' + R.level : '') + ' · seen ' + seen + ' of ' + Object.keys(by).length + (R.by ? ' · started by ' + R.by : '');
+  S.reLeft = Object.keys(by).length - seen;
   $('reList').innerHTML = sids.map(function (sid) {
     var n = byId(sid);
     return '<div class="stu"><b>' + esc(n[1]) + '</b><span>' + esc(n[2]) + '</span>' + by[sid].map(function (i) {
@@ -465,11 +508,26 @@ function paintRecheck() {
   $('reList').querySelectorAll('[data-r]').forEach(function (b) { b.onclick = function () {
     var k = b.dataset.k.split('|'), r = b.dataset.r;
     S.re.marks = S.re.marks.filter(function (m) { return !(m.sid === k[0] && m.code === k[1]); }).concat([{ sid: k[0], code: k[1], result: r, teacher: S.me }]); paintRecheck();
-    post('recheck', { sid: k[0], code: k[1], result: r, teacher: S.me, device: device }).then(function (j) { if (!j.ok) { say('mRe', j.error, 'bad'); loadRecheck(); } }, function () { say('mRe', 'No signal: that mark was not sent. Tap it again when you are connected.', 'bad'); });
+    post('recheck', { sid: k[0], code: k[1], result: r, teacher: S.me, device: device }).then(function (j) { if (!j.ok) loadRecheck(j.error); }, function () { say('mRe', 'No signal: that mark was not sent. Tap it again when you are connected.', 'bad'); });
   }; });
 }
 
+function endRecheck() {
+  var n = S.reLeft || 0;
+  if (!confirm('End this recheck?\n\n' + (n ? n + ' student' + (n === 1 ? '' : 's') + ' not marked will become "did not report".' : 'Everyone has been marked.') + ' Nobody can mark it after this.')) return;
+  $('reEnd').querySelector('button').disabled = true;
+  send('endRecheck', { teacher: S.me, device: device }).then(function (j) {
+    $('reEnd').querySelector('button').disabled = false;
+    if (!j.ok) return say('mRe', j.error, 'bad');
+    S.re = null; $('doneHead').textContent = 'Recheck ended';
+    facts([['Date', dayShort(today())], ['Ended by', S.me], ['Not marked', n + ' student' + (n === 1 ? '' : 's')]]);
+    $('doneTip').textContent = 'The Discipline app marks anyone not marked as "did not report" when it next collects, and leaves out students who were absent or late once that day\'s Cockpit file is in.';
+    $('doneAgain').hidden = true; show('pDone');
+  }, function () { $('reEnd').querySelector('button').disabled = false; say('mRe', 'No signal: the recheck is still open. Try again when you are connected.', 'bad'); });
+}
+
 /* ---------- start ---------- */
+setRole(loginRole);
 if (S.token && S.names.length) { if (S.me) show('pHome'); else { show('pWho'); paintWho(); } }
 </script>
 </body>
