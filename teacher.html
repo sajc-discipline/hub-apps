@@ -113,7 +113,15 @@ h2{font-family:var(--head);font-weight:400;font-size:28px;line-height:1.15;margi
 @media (prefers-reduced-motion:reduce){.stamp i{animation:none}}
 .pwbox{position:relative}
 .pwbox input{width:100%;padding-right:60px}
-.eye{position:absolute;right:4px;top:3px;width:48px;height:48px;border:0;background:none;color:var(--muted);cursor:pointer}
+.eye{position:absolute;right:4px;top:3px;width:48px;height:48px;border:0;background:none;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:8px}
+.eye[aria-pressed=true] .slash{display:none}
+.facts{margin:6px 0 0;border-top:1px solid var(--line)}
+.facts div{display:flex;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid var(--line)}
+.facts dt{color:var(--muted);font-size:15px;margin:0}
+.facts dd{margin:0;font-size:17px;font-weight:600;text-align:right;word-break:break-word}
+.tip{margin:18px 0 0;padding:14px 16px;border-radius:10px;background:var(--hi);font-size:15px;line-height:1.45}
+.acts{display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:22px}
+.acts .btn{max-width:340px}
 </style>
 </head>
 <body>
@@ -124,14 +132,13 @@ h2{font-family:var(--head);font-weight:400;font-size:28px;line-height:1.15;margi
   <h1>Teachers</h1>
   <p class="lede">Grooming checks and logging an offence.</p>
   <div class="msg" id="mLogin"></div>
-  <div class="field"><label for="pw">Password</label><div class="pwbox"><input id="pw" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"><button type="button" class="eye" aria-label="Show password" onclick="var i=$('pw');i.type=i.type==='password'?'text':'password'">◉</button></div></div>
+  <div class="field"><label for="pw">Password</label><div class="pwbox"><input id="pw" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"><button type="button" class="eye" id="eye" aria-label="Show password" aria-pressed="false" onclick="togglePw()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path class="slash" d="M4 4l16 16"/></svg></button></div></div>
   <button class="btn" id="btnLogin" onclick="doLogin()">Sign in</button>
 </section>
 
 <section class="pane" id="pWho">
-  <h2>Who are you?</h2>
-  <p class="lede">Picked once on this phone. Everything you submit carries your name.</p>
-  <div class="search"><input id="whoQ" placeholder="Type part of your name" oninput="paintWho()" autocomplete="off"></div>
+  <h2>Please select your name</h2>
+  <div class="search" style="margin-top:16px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><input id="whoQ" placeholder="Search" aria-label="Search for your name" oninput="paintWho()" autocomplete="off"></div>
   <div id="whoList" style="margin-top:8px"></div>
 </section>
 
@@ -141,7 +148,7 @@ h2{font-family:var(--head);font-weight:400;font-size:28px;line-height:1.15;margi
   <div class="menu">
     <button class="btn" onclick="openCheck()"><span>Grooming check<small>Mark a class at assembly</small></span></button>
     <button class="btn quiet" onclick="openFind()"><span>Log an offence<small>One student, any time</small></span></button>
-    <button class="btn quiet" id="btnRe" onclick="openRecheck()" hidden><span>Recheck<small>Discipline committee</small></span></button>
+    <button class="btn quiet" id="btnRe" onclick="openRecheck()" hidden><span>Recheck<small>Discipline committee only</small></span></button>
   </div>
   <div id="loggedWrap"></div>
   <div class="sp"></div>
@@ -150,8 +157,7 @@ h2{font-family:var(--head);font-weight:400;font-size:28px;line-height:1.15;margi
 
 <section class="pane" id="pCheck">
   <h2>Grooming check</h2>
-  <div class="duo" style="margin-top:12px"><div class="field"><label for="cls">Class</label><select id="cls" onchange="loadClass()"></select></div>
-  <div class="field"><label for="date">Date</label><input id="date" type="date" onchange="loadClass()"></div></div>
+  <div class="field" style="margin-top:12px"><label for="cls">Class</label><select id="cls" onchange="loadClass()"></select></div>
   <p class="state" id="clsState"></p>
   <div class="msg" id="mCheck"></div>
   <div id="rows"></div>
@@ -161,7 +167,7 @@ h2{font-family:var(--head);font-weight:400;font-size:28px;line-height:1.15;margi
 <section class="pane" id="pFind">
   <h2>Log an offence</h2>
   <p class="lede">Find the student.</p>
-  <div class="search"><input id="findQ" placeholder="Type part of a name" oninput="paintFind()" autocomplete="off" autocapitalize="characters"></div>
+  <div class="search"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><input id="findQ" placeholder="Search" aria-label="Search for a student" oninput="paintFind()" autocomplete="off" autocapitalize="characters"></div>
   <div id="findList" style="margin-top:8px"></div>
 </section>
 
@@ -183,16 +189,16 @@ h2{font-family:var(--head);font-weight:400;font-size:28px;line-height:1.15;margi
   <h2>Recheck</h2>
   <p class="state" id="reState"></p>
   <div class="msg" id="mRe"></div>
-  <div class="search"><input id="reQ" placeholder="Find a student" oninput="paintRecheck()" autocomplete="off"></div>
+  <div class="search"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><input id="reQ" placeholder="Search" aria-label="Search for a student" oninput="paintRecheck()" autocomplete="off"></div>
   <div id="reList" style="margin-top:6px"></div>
   <p class="note" style="margin-top:16px">Ending the recheck (everyone left becomes "did not report") is done in the Discipline app.</p>
 </section>
 
 <section class="pane" id="pDone">
   <div class="stamp"><i><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></i><p id="doneHead">Submitted</p></div>
-  <p class="lede" id="doneText" style="text-align:center"></p>
-  <div class="sp"></div>
-  <div class="menu"><button class="btn" id="doneAgain"></button><button class="btn quiet" onclick="show('pHome')">Done</button></div>
+  <dl class="facts" id="doneFacts"></dl>
+  <p class="tip" id="doneTip"></p>
+  <div class="acts"><button class="btn" onclick="show('pHome')">Done</button><button class="btn quiet" id="doneAgain"></button></div>
 </section>
 
 <script>
@@ -213,6 +219,8 @@ function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function 
 function say(id, t, kind) { var el = $(id); if (!el) return; el.textContent = t || ''; el.className = 'msg' + (kind ? ' ' + kind : ''); }
 function dayShort(iso) { var d = new Date(iso + 'T00:00:00'); return d.toLocaleDateString('en-SG', { weekday: 'short', day: 'numeric', month: 'short' }); }
 function hhmm(iso) { var d = new Date(iso); return isNaN(d) ? '' : d.toLocaleTimeString('en-SG', { hour: 'numeric', minute: '2-digit' }); }
+function togglePw() { var i = $('pw'), on = i.type === 'password'; i.type = on ? 'text' : 'password'; $('eye').setAttribute('aria-pressed', on); $('eye').setAttribute('aria-label', on ? 'Hide password' : 'Show password'); }
+function facts(rows) { $('doneFacts').innerHTML = rows.map(function (r) { return '<div><dt>' + esc(r[0]) + '</dt><dd>' + esc(r[1]) + '</dd></div>'; }).join(''); }
 function uid() { return device + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
 /* drafts of unsent marks: this phone only, cleared the next day */
@@ -224,6 +232,18 @@ function post(action, body) {
     .then(function (r) { return r.json(); })
     .then(function (j) { setConn(true); if (j && j.signedOut) signOut(true); return j; }, function (e) { setConn(false); throw e; });
 }
+/* Submitting at a busy moment (a whole level at assembly): if Google is briefly too busy or the signal drops,
+   try again by itself a few times, spaced out a little at random so the phones don't all retry together.
+   Sending twice is harmless: the sheet and the app both ignore a repeat. */
+function send(action, body, tries) {
+  tries = tries || 0;
+  return post(action, JSON.parse(JSON.stringify(body))).then(function (j) {
+    if (!j.ok && /too many|busy|timed? ?out|lock|service|try again/i.test(j.error || '') && tries < 7) return wait(tries).then(function () { return send(action, body, tries + 1); });
+    return j;
+  }, function (e) { if (tries < 7) return wait(tries).then(function () { return send(action, body, tries + 1); }); throw e; });
+}
+/* about 1, 2, 3.5, 5, 7, 9, 11 s apart, with some randomness: up to ~40 s of patience before giving up */
+function wait(t) { return new Promise(function (r) { setTimeout(r, [800, 1600, 2800, 4000, 5500, 7000, 8500][t] + Math.random() * 2000); }); }
 function setConn(on) { var c = $('conn'); c.className = 'conn' + (on ? '' : ' off'); c.querySelector('span').textContent = on ? 'Connected' : 'No signal'; }
 
 var screen = 'pLogin', trail = [];
@@ -245,7 +265,7 @@ function doLogin() {
   if (!API) return say('mLogin', 'This page has not been connected to the Google script yet.', 'bad');
   var pw = $('pw').value; if (!pw) return;
   $('btnLogin').disabled = true; say('mLogin', '');
-  post('login', { role: 'teacher', password: pw }).then(function (j) {
+  send('login', { role: 'teacher', password: pw }).then(function (j) {
     $('btnLogin').disabled = false;
     if (!j.ok) return say('mLogin', j.error, 'bad');
     S.token = j.token; S.role = j.role; S.names = j.names || []; S.lists = j.lists || {};
@@ -284,27 +304,35 @@ function catName(code) { var c = (S.lists.cats || []).filter(function (x) { retu
 function othersCode() { var c = (S.lists.cats || []).filter(function (x) { return x.others; })[0]; return c ? c.code : 'C8'; }
 
 /* ---------- grooming check ---------- */
-function draftKey() { return 'tch.draft.' + $('date').value + '|' + $('cls').value; }
+function draftKey() { return 'tch.draft.' + today() + '|' + $('cls').value; }
 function dirty() { return Object.keys(S.marks).some(function (k) { var m = S.marks[k]; return m.codes.length || m.absent; }) && !S.synced; }
 function openCheck() {
   var cl = classes(), last = LS.get('tch.cls', '');
   $('cls').innerHTML = cl.map(function (c) { return '<option' + (c === last ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('');
-  if (!$('date').value) $('date').value = today();
-  $('date').max = today();
   show('pCheck'); loadClass();
 }
 function loadClass() {
   LS.set('tch.cls', $('cls').value);
-  S.open = null; S.others = []; S.submitted = []; S.synced = false;
+  S.open = null; S.others = []; S.submitted = []; S.synced = false; S.touched = false;
   var d = LS.get(draftKey(), null); S.marks = d || {}; S.fromDraft = !!d;
+  var ticket = S.ticket = (S.ticket || 0) + 1, forCls = $('cls').value;
   say('mCheck', ''); paintClass();
   $('clsState').textContent = 'Loading…';
-  post('myCheck', { cls: $('cls').value, date: $('date').value, teacher: S.me }).then(function (j) {
+  send('myCheck', { cls: $('cls').value, teacher: S.me }).then(function (j) {
+    if (ticket !== S.ticket || forCls !== $('cls').value) return;   // an answer for a class no longer on screen
     if (!j.ok) { $('clsState').textContent = ''; return say('mCheck', j.error, 'bad'); }
     S.others = j.others || []; S.submitted = j.submitted || [];
-    if (!S.fromDraft) { S.marks = {}; (j.mine || []).forEach(function (m) { S.marks[m.sid] = { codes: m.codes, absent: m.absent, remark: m.remark || '' }; }); S.synced = (j.mine || []).length > 0; }
+    if (!S.fromDraft) {
+      /* what this teacher sent earlier today, combined with anything tapped while it was loading — taps are never lost */
+      (j.mine || []).forEach(function (m) {
+        var cur = S.marks[m.sid];
+        if (!cur) S.marks[m.sid] = { codes: m.codes.slice(), absent: m.absent, remark: m.remark || '' };
+        else if (!cur.absent) { m.codes.forEach(function (c) { if (cur.codes.indexOf(c) < 0) cur.codes.push(c); }); if (!cur.remark) cur.remark = m.remark || ''; }
+      });
+      S.synced = (j.mine || []).length > 0 && !S.touched;
+    }
     paintClass();
-  }, function () { $('clsState').textContent = 'No signal: marks are kept on this phone until you submit.'; });
+  }, function () { if (ticket !== S.ticket) return; $('clsState').textContent = 'No signal: marks are kept on this phone until you submit.'; });
 }
 function studentsOf(cls) { return S.names.filter(function (n) { return n[2] === cls; }).sort(function (a, b) { return (+a[3] || 999) - (+b[3] || 999) || (a[1] < b[1] ? -1 : 1); }); }
 function paintClass() {
@@ -330,26 +358,29 @@ function paintClass() {
   $('rows').querySelectorAll('[data-abs]').forEach(function (b) { b.onclick = function () { var m = mk(S.open); m.absent = !m.absent; if (m.absent) m.codes = []; changed(); }; });
   var r = $('remark'); if (r) r.oninput = function () { mk(S.open).remark = r.value; LS.set(draftKey(), S.marks); };
   var n = 0, f = 0, a = 0; Object.keys(S.marks).forEach(function (k) { var m = S.marks[k]; if (m.absent) a++; else if (m.codes.length) { n++; f += m.codes.length; } });
-  $('btnSubmit').textContent = 'Submit ' + cls + ' · ' + (n || a ? n + ' student' + (n === 1 ? '' : 's') + ', ' + f + ' fail' + (f === 1 ? '' : 's') + (a ? ', ' + a + ' absent' : '') : 'everyone passed');
+  var fl = n + a;
+  $('btnSubmit').textContent = 'Submit ' + cls + ' · ' + (fl ? fl + ' student' + (fl === 1 ? '' : 's') + ' flagged' : 'nobody flagged');
 }
 function mk(sid) { return S.marks[sid] || (S.marks[sid] = { codes: [], absent: false, remark: '' }); }
 function toggle(sid, code) { var m = mk(sid), i = m.codes.indexOf(code); if (i >= 0) m.codes.splice(i, 1); else { m.codes.push(code); m.absent = false; } changed(); }
-function changed() { S.synced = false; LS.set(draftKey(), S.marks); paintClass(); }
+function changed() { S.synced = false; S.touched = true; LS.set(draftKey(), S.marks); paintClass(); }
 function submitCheck() {
-  var oc = othersCode(), cls = $('cls').value, date = $('date').value;
+  var oc = othersCode(), cls = $('cls').value;
   var bad = Object.keys(S.marks).filter(function (k) { var m = S.marks[k]; return !m.absent && m.codes.indexOf(oc) >= 0 && !String(m.remark || '').trim(); });
   if (bad.length) { S.open = bad[0]; paintClass(); return say('mCheck', 'Others needs a remark: say what it was.', 'bad'); }
   var marks = Object.keys(S.marks).map(function (k) { var m = S.marks[k]; return { sid: k, codes: m.absent ? [] : m.codes, absent: !!m.absent, remark: m.remark || '' }; }).filter(function (m) { return m.absent || m.codes.length; });
-  $('btnSubmit').disabled = true; say('mCheck', '');
-  post('check', { cls: cls, date: date, teacher: S.me, device: device, marks: marks, othersCode: oc }).then(function (j) {
+  say('mCheck', '');
+  $('btnSubmit').disabled = true; $('btnSubmit').textContent = 'Sending…';
+  send('check', { cls: cls, teacher: S.me, device: device, marks: marks, othersCode: oc }).then(function (j) {
     $('btnSubmit').disabled = false;
-    if (!j.ok) return say('mCheck', j.error, 'bad');
+    if (!j.ok) { paintClass(); return say('mCheck', j.error, 'bad'); }
     LS.del(draftKey()); S.synced = true;
     $('doneHead').textContent = 'Submitted';
-    $('doneText').textContent = cls + ', ' + dayShort(date) + ', by ' + S.me + '. ' + j.fails + ' fail' + (j.fails === 1 ? '' : 's') + (j.absent ? ', ' + j.absent + ' absent' : '') + '. Spotted a mistake? Open the class again, fix it and submit: it replaces this one.';
+    facts([['Class', cls], ['Date', dayShort(j.date || today())], ['Submitted by', S.me], ['Students flagged', String(j.flagged)]].concat(j.absent ? [['Of whom absent', String(j.absent)]] : []));
+    $('doneTip').textContent = 'Made a mistake? Open the class again and change it there, then submit again.';
     $('doneAgain').textContent = 'Check another class'; $('doneAgain').onclick = function () { show('pCheck'); var o = $('cls'); if (o.selectedIndex < o.options.length - 1) o.selectedIndex++; loadClass(); };
     show('pDone');
-  }, function () { $('btnSubmit').disabled = false; say('mCheck', 'No signal. Your marks are kept on this phone; press Submit again when you are connected.', 'bad'); });
+  }, function () { $('btnSubmit').disabled = false; paintClass(); say('mCheck', 'Could not reach the committee\'s sheet. Your marks are kept on this phone; press Submit again in a moment.', 'bad'); });
 }
 
 /* ---------- log an offence ---------- */
@@ -387,14 +418,16 @@ function saveOffence() {
   if (((t && t.remark) || (g && S.codes.indexOf(othersCode()) >= 0)) && !rem) return say('mOff', 'This one needs a remark.', 'bad');
   var id = uid(), what = g ? S.codes.map(catName).join(', ') : t.label;
   $('btnOff').disabled = true; say('mOff', '');
-  post('offence', { id: id, sid: n[0], cls: n[2], date: $('offDate').value, teacher: S.me, device: device, kind: g ? 'groom' : 'offence', code: g ? '' : S.type, codes: g ? S.codes : [], remark: rem }).then(function (j) {
+  send('offence', { id: id, sid: n[0], cls: n[2], date: $('offDate').value, teacher: S.me, device: device, kind: g ? 'groom' : 'offence', code: g ? '' : S.type, codes: g ? S.codes : [], remark: rem }).then(function (j) {
     $('btnOff').disabled = false;
     if (!j.ok) return say('mOff', j.error, 'bad');
     var L = LS.get('tch.logged', []).filter(function (x) { return x.at.slice(0, 10) === today(); }); L.push({ id: id, name: n[1], cls: n[2], what: what, at: new Date().toISOString() }); LS.set('tch.logged', L);
-    $('doneHead').textContent = 'Logged'; $('doneText').textContent = n[1] + ', ' + n[2] + ': ' + what + '. You can undo it from the first screen for 15 minutes.';
+    $('doneHead').textContent = 'Logged';
+    facts([['Student', n[1]], ['Class', n[2]], ['Offence', what], ['Date', dayShort($('offDate').value)], ['Logged by', S.me]]);
+    $('doneTip').textContent = 'Made a mistake? Undo it from the first screen within 15 minutes. After that, tell the discipline committee.';
     $('doneAgain').textContent = 'Log another'; $('doneAgain').onclick = openFind;
     show('pDone');
-  }, function () { $('btnOff').disabled = false; say('mOff', 'No signal. Nothing was sent; try again when you are connected.', 'bad'); });
+  }, function () { $('btnOff').disabled = false; say('mOff', 'Could not reach the committee\'s sheet. Nothing was sent; press Log it again in a moment.', 'bad'); });
 }
 function undoOffence(id) {
   if (!confirm('Undo this?')) return;
@@ -408,7 +441,7 @@ function undoOffence(id) {
 function openRecheck() { $('reQ').value = ''; show('pRecheck'); loadRecheck(); }
 function loadRecheck() {
   $('reState').textContent = 'Loading…'; say('mRe', '');
-  post('recheckList', {}).then(function (j) {
+  send('recheckList', {}).then(function (j) {
     if (!j.ok) { $('reState').textContent = ''; return say('mRe', j.error, 'bad'); }
     S.re = j; paintRecheck();
   }, function () { $('reState').textContent = ''; say('mRe', 'No signal.', 'bad'); });

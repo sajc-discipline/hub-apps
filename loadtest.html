@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SAJC Discipline — load test</title>
+<!--
+  Fires many teachers' submissions at the Google script at the same moment and times them. It writes to a
+  pretend class, ZZTEST, with pretend students: the Discipline app ignores it and deletes it the next time
+  it collects, and the night clean-up removes anything left. Run it after school, not while the gate is busy.
+  Set API below to the same web app address as teacher.html.
+-->
+<style>
+body{font-family:Inter,'Segoe UI',system-ui,sans-serif;margin:32px;max-width:820px;color:#1b1e2b;background:#f6f5f1;line-height:1.45}
+h1{font-family:'Libre Caslon Display',Georgia,serif;font-weight:400;font-size:32px;margin:0 0 6px}
+p{color:#5c6070}
+label{display:block;font-weight:600;font-size:14px;color:#5c6070;margin:14px 0 4px}
+input{font:inherit;height:44px;border:1.5px solid #d9d6cd;border-radius:8px;padding:0 12px;background:#fbfaf7;width:260px}
+button{font:inherit;height:48px;padding:0 22px;border-radius:8px;border:0;background:#27326a;color:#fff;font-weight:600;cursor:pointer;margin-top:16px}
+button:disabled{opacity:.5}
+table{border-collapse:collapse;margin-top:18px;width:100%}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid #d9d6cd;font-variant-numeric:tabular-nums}
+th{font-size:13px;color:#5c6070;text-transform:uppercase;letter-spacing:.04em}
+.good{color:#2b6349;font-weight:600}.bad{color:#9b2c22;font-weight:600}
+#log{white-space:pre-wrap;font-family:ui-monospace,Consolas,monospace;font-size:13px;margin-top:16px;color:#5c6070}
+</style>
+</head>
+<body>
+<h1>Load test</h1>
+<p>Pretends that many teachers press <b>Submit</b> on a grooming check at the same moment, and times how long Google takes. It uses a pretend class (ZZTEST) that the Discipline app ignores and clears. Run it after school.</p>
+<label for="pw">Teacher password</label><input id="pw" type="password">
+<label for="n">Phones at once</label><input id="n" type="number" value="25" min="1" max="80">
+<br><button id="go" onclick="run()">Run the test</button>
+<table id="out" hidden><thead><tr><th>What</th><th>Done</th><th>Fastest</th><th>Typical</th><th>Slowest</th><th>Had to retry</th></tr></thead><tbody id="rows"></tbody></table>
+<div id="log"></div>
+<script>
+var API = 'https://script.google.com/macros/s/AKfycbz30kSEhCeopfnuJRxQav7tOUP-iRTTOFpfWrmZJPTZfX1KMdJQtGIAH7s5_7eqTw67dA/exec';   // ← the same web app address as teacher.html
+function $(id) { return document.getElementById(id); }
+function log(t) { $('log').textContent += t + '\n'; }
+function post(body) { return fetch(API, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body), redirect: 'follow' }).then(function (r) { return r.json(); }); }
+function wait(t) { return new Promise(function (r) { setTimeout(r, [800, 1600, 2800, 4000, 5500, 7000, 8500][t] + Math.random() * 2000); }); }
+/* the same patience as teacher.html */
+function send(body, info, t) {
+  t = t || 0;
+  return post(body).then(function (j) {
+    if (!j.ok && /too many|busy|timed? ?out|lock|service|try again/i.test(j.error || '') && t < 7) { info.retries++; return wait(t).then(function () { return send(body, info, t + 1); }); }
+    return j;
+  }, function (e) { if (t < 7) { info.retries++; return wait(t).then(function () { return send(body, info, t + 1); }); } throw e; });
+}
+function burst(label, n, make) {
+  var res = [], t0 = performance.now();
+  return Promise.all(Array.from({ length: n }, function (_, i) {
+    var info = { retries: 0 }, s = performance.now();
+    return send(make(i), info).then(function (j) { res.push({ ok: !!j.ok, ms: performance.now() - s, retries: info.retries, err: j.error }); },
+      function (e) { res.push({ ok: false, ms: performance.now() - s, retries: info.retries, err: String(e) }); });
+  })).then(function () {
+    var ok = res.filter(function (r) { return r.ok; }), ms = ok.map(function (r) { return r.ms; }).sort(function (a, b) { return a - b; });
+    var f = function (x) { return x == null ? '—' : (x / 1000).toFixed(1) + ' s'; };
+    $('rows').insertAdjacentHTML('beforeend', '<tr><td>' + label + '</td><td class="' + (ok.length === n ? 'good' : 'bad') + '">' + ok.length + ' of ' + n + '</td><td>' + f(ms[0]) + '</td><td>' + f(ms[Math.floor(ms.length / 2)]) + '</td><td>' + f(ms[ms.length - 1]) + '</td><td>' + res.filter(function (r) { return r.retries; }).length + '</td></tr>');
+    res.filter(function (r) { return !r.ok; }).slice(0, 5).forEach(function (r) { log('  failed: ' + r.err); });
+    log(label + ': whole burst ' + ((performance.now() - t0) / 1000).toFixed(1) + ' s');
+  });
+}
+function run() {
+  if (!API) return alert('Set API at the bottom of this file first.');
+  var n = Math.max(1, Math.min(80, +$('n').value || 25)); $('go').disabled = true; $('rows').innerHTML = ''; $('out').hidden = false; $('log').textContent = '';
+  var tok, info = { retries: 0 };
+  send({ action: 'login', role: 'teacher', password: $('pw').value }, info).then(function (j) {
+    if (!j.ok) throw new Error(j.error);
+    tok = j.token; log('Signed in: ' + (j.names || []).length + ' students in the list.');
+    return burst('Signing in', n, function () { return { action: 'login', role: 'teacher', password: $('pw').value }; });
+  }).then(function () {
+    return burst('Opening a class', n, function (i) { return { action: 'myCheck', token: tok, cls: 'ZZTEST', teacher: 'Load test ' + (i + 1) }; });
+  }).then(function () {
+    return burst('Submitting a check', n, function (i) {
+      return { action: 'check', token: tok, cls: 'ZZTEST', teacher: 'Load test ' + (i + 1), device: 'LOADTEST', othersCode: 'C8',
+        marks: [{ sid: 'ZZ-' + i + '-1', codes: ['C6'] }, { sid: 'ZZ-' + i + '-2', codes: ['C2', 'C7'] }, { sid: 'ZZ-' + i + '-3', absent: true }] };
+    });
+  }).then(function () { log('\nDone. Open the Discipline app and refresh: it clears the ZZTEST rows from Google.'); $('go').disabled = false; },
+    function (e) { log('Stopped: ' + e.message); $('go').disabled = false; });
+}
+</script>
+</body>
+</html>
