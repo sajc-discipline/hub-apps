@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f6f5f1">
+<title>SAJC Discipline — Teachers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Libre+Caslon+Display&display=swap" rel="stylesheet">
+<!--
+  SAJC Discipline — the teachers' page: grooming checks, logging an offence, and (discipline committee
+  only) rechecks.
+
+  THIS FILE HOLDS NO STUDENT DATA. It is code only, which is why it can sit on GitHub Pages next to the
+  gate page. Names and lists come from the Google script owned by discipline@ after sign-in and live in
+  this browser tab only (sessionStorage). Marks for a class that have not been submitted yet wait in
+  this phone's storage until they are sent, and are cleared the next day.
+
+  To point it at the script, set API below to the web app address (the same one the gate page uses).
+-->
+<style>
+:root{--ground:#f6f5f1;--raised:#fbfaf7;--ink:#1b1e2b;--muted:#5c6070;--line:#d9d6cd;--accent:#27326a;--on:#fff;--hi:#e3e6f2;--soft:#e7e4dc;
+  --good:#2b6349;--good-t:#e3efe7;--warn:#8a6216;--warn-t:#f5ecd6;--bad:#9b2c22;--bad-t:#f6e3df;--head:'Libre Caslon Display',Georgia,serif}
+@media (prefers-color-scheme:dark){:root{--ground:#15171f;--raised:#1c1f29;--ink:#eceae4;--muted:#a3a6b3;--line:#343846;--accent:#8e9be0;--on:#11131a;--hi:#262b40;--soft:#262934;
+  --good:#7cc29a;--good-t:#1f3a2b;--warn:#e0b45a;--warn-t:#3a311c;--bad:#f08b80;--bad-t:#3d211d}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--ground);color:var(--ink);font-family:Inter,'Segoe UI',system-ui,sans-serif;font-size:17px;line-height:1.4}
+button,input,select,textarea{font:inherit;color:inherit}
+.top{display:flex;align-items:center;justify-content:space-between;min-height:48px;padding:6px 20px 0}
+.back{display:flex;align-items:center;gap:4px;border:0;background:none;color:var(--muted);font-size:17px;padding:8px 0;cursor:pointer}
+.back[hidden]{display:block;visibility:hidden}
+.conn{display:flex;align-items:center;gap:7px;font-size:14px;color:var(--muted)}
+.conn i{width:8px;height:8px;border-radius:50%;background:var(--good);display:inline-block}
+.conn.off i{background:#c08a2b}
+.pane{display:none;padding:10px 20px 24px;min-height:calc(100dvh - 54px);flex-direction:column}
+.pane.on{display:flex;animation:fade .15s ease}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.pane.on{animation:none}}
+.brand{display:flex;flex-direction:column;gap:4px;margin:0 0 22px}
+.brand .ey{font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.brand .nm{font-family:var(--head);font-size:22px;line-height:1.15}
+h1{font-family:var(--head);font-weight:400;font-size:34px;line-height:1.1;margin:0}
+h2{font-family:var(--head);font-weight:400;font-size:28px;line-height:1.15;margin:0}
+.lede{font-size:16px;color:var(--muted);margin:6px 0 16px}
+.sp{flex:1}
+.btn{min-height:60px;width:100%;border-radius:10px;border:0;background:var(--accent);color:var(--on);font-size:18px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;padding:0 14px;text-align:center}
+.btn:disabled{opacity:.5}
+.btn.quiet{background:transparent;color:var(--ink);border:1.5px solid var(--line)}
+.link{display:inline-flex;align-items:center;gap:6px;border:0;background:none;color:var(--muted);font-size:16px;padding:10px 0;text-decoration:underline;cursor:pointer}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.field label,.lab{font-size:15px;font-weight:600;color:var(--muted)}
+.field input,.field select,.field textarea{min-height:54px;border:1.5px solid var(--line);border-radius:10px;background:var(--raised);padding:0 14px;font-size:18px}
+.field textarea{padding:12px 14px;min-height:90px;resize:vertical}
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.msg{margin:8px 0;padding:12px 14px;border-radius:8px;font-size:15px;background:var(--warn-t)}
+.msg.bad{background:var(--bad-t)}
+.msg.good{background:var(--good-t)}
+.msg:empty{display:none}
+.menu{display:flex;flex-direction:column;gap:12px}
+.menu .btn{min-height:72px;font-size:19px;justify-content:flex-start;padding:0 20px}
+.menu .btn small{display:block;font-size:14px;font-weight:400;opacity:.8}
+.menu .btn span{display:block;text-align:left}
+.foot{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding:14px 0 6px;font-size:15px;color:var(--muted);gap:12px;flex-wrap:wrap}
+.foot button{border:0;background:none;color:var(--muted);text-decoration:underline;padding:4px 0;cursor:pointer;font-size:15px}
+.pick{display:block;width:100%;text-align:left;padding:14px 0;border:0;border-top:1px solid var(--line);background:none;cursor:pointer;font-size:18px}
+.pick span{display:block;font-size:15px;color:var(--muted)}
+.search{display:flex;align-items:center;gap:10px;height:56px;border:1.5px solid var(--line);border-radius:10px;background:var(--raised);padding:0 14px;color:var(--muted)}
+.search input{flex:1;border:0;background:none;outline:none;font-size:18px;min-width:0}
+/* the class list */
+.state{font-size:15px;color:var(--muted);margin:2px 0 8px}
+.row{border-top:1px solid var(--line)}
+.row > button{display:flex;width:100%;align-items:baseline;gap:10px;padding:13px 2px;border:0;background:none;text-align:left;cursor:pointer}
+.row .sn{width:24px;flex:none;color:var(--muted);font-size:15px;font-variant-numeric:tabular-nums}
+.row .nm{flex:1;font-size:17px;line-height:1.3}
+.row .sum{display:block;font-size:14px;color:var(--bad);margin-top:2px}
+.row .sum.abs{color:var(--warn)}
+.row .oth{display:block;font-size:13px;color:var(--muted);margin-top:2px}
+.row.open{background:var(--soft);margin:0 -12px;padding:0 12px 12px;border-radius:0}
+.row.open .nm{font-weight:600}
+.cats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cat{min-height:52px;border:1.5px solid var(--line);border-radius:9px;background:var(--raised);font-size:15px;line-height:1.2;padding:6px 8px;cursor:pointer}
+.cat[aria-pressed=true]{border-color:var(--bad);background:var(--bad-t);color:var(--bad);font-weight:600}
+.cat.abs{grid-column:1/-1}
+.cat.abs[aria-pressed=true]{border-color:var(--warn);background:var(--warn-t);color:var(--warn)}
+.rem{margin-top:8px;width:100%;min-height:48px;border:1.5px solid var(--line);border-radius:9px;background:var(--raised);padding:0 12px;font-size:16px}
+.bar{position:sticky;bottom:0;background:var(--ground);padding:12px 0 8px;margin-top:10px;border-top:1px solid var(--line)}
+/* offences */
+.types{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+.type{min-height:54px;border:1.5px solid var(--line);border-radius:10px;background:var(--raised);text-align:left;padding:0 16px;font-size:17px;cursor:pointer}
+.type[aria-pressed=true]{border-color:var(--accent);background:var(--hi);font-weight:600}
+.note{font-size:14px;color:var(--muted);margin:-6px 0 14px}
+.rec{padding:12px 0;border-top:1px solid var(--line);display:flex;gap:10px;align-items:baseline}
+.rec div{flex:1}
+.rec b{display:block;font-size:17px}
+.rec span{font-size:14px;color:var(--muted)}
+.eyebrow{font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:24px 0 4px}
+/* rechecks */
+.ri{display:flex;align-items:center;gap:10px;padding:8px 0}
+.ri .what{flex:1;font-size:16px}
+.ri .what span{display:block;font-size:13px;color:var(--muted)}
+.seg{display:flex;border:1.5px solid var(--line);border-radius:9px;overflow:hidden;flex:none}
+.seg button{min-height:46px;min-width:84px;border:0;background:var(--raised);font-size:15px;cursor:pointer;padding:0 8px}
+.seg button + button{border-left:1.5px solid var(--line)}
+.seg button[data-r=fixed][aria-pressed=true]{background:var(--good-t);color:var(--good);font-weight:600}
+.seg button[data-r=notfixed][aria-pressed=true]{background:var(--bad-t);color:var(--bad);font-weight:600}
+.stu{border-top:1px solid var(--line);padding:12px 0 4px}
+.stu > b{font-size:17px}
+.stu > span{font-size:14px;color:var(--muted);margin-left:6px}
+.stamp{display:flex;flex-direction:column;align-items:center;margin:30px 0 10px}
+.stamp i{width:72px;height:72px;border-radius:50%;background:var(--good);color:#fff;display:flex;align-items:center;justify-content:center;animation:pop .25s ease}
+.stamp p{font-family:var(--head);font-size:28px;margin:10px 0 0;color:var(--good)}
+@keyframes pop{from{transform:scale(.85);opacity:.4}to{transform:scale(1);opacity:1}}
+@media (prefers-reduced-motion:reduce){.stamp i{animation:none}}
+.pwbox{position:relative}
+.pwbox input{width:100%;padding-right:60px}
+.eye{position:absolute;right:4px;top:3px;width:48px;height:48px;border:0;background:none;color:var(--muted);cursor:pointer}
+</style>
+</head>
+<body>
+<div class="top"><button class="back" id="back" hidden onclick="goBack()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg>Back</button><div class="conn" id="conn"><i></i><span>Connected</span></div></div>
+
+<section class="pane on" id="pLogin">
+  <div class="brand"><span class="ey">St. Andrew's Junior College</span><span class="nm">SAJC Discipline Committee</span></div>
+  <h1>Teachers</h1>
+  <p class="lede">Grooming checks and logging an offence.</p>
+  <div class="msg" id="mLogin"></div>
+  <div class="field"><label for="pw">Password</label><div class="pwbox"><input id="pw" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"><button type="button" class="eye" aria-label="Show password" onclick="var i=$('pw');i.type=i.type==='password'?'text':'password'">◉</button></div></div>
+  <button class="btn" id="btnLogin" onclick="doLogin()">Sign in</button>
+</section>
+
+<section class="pane" id="pWho">
+  <h2>Who are you?</h2>
+  <p class="lede">Picked once on this phone. Everything you submit carries your name.</p>
+  <div class="search"><input id="whoQ" placeholder="Type part of your name" oninput="paintWho()" autocomplete="off"></div>
+  <div id="whoList" style="margin-top:8px"></div>
+</section>
+
+<section class="pane" id="pHome">
+  <div class="brand"><span class="ey">SAJC Discipline Committee</span><span class="nm" id="hello"></span></div>
+  <div class="msg" id="mHome"></div>
+  <div class="menu">
+    <button class="btn" onclick="openCheck()"><span>Grooming check<small>Mark a class at assembly</small></span></button>
+    <button class="btn quiet" onclick="openFind()"><span>Log an offence<small>One student, any time</small></span></button>
+    <button class="btn quiet" id="btnRe" onclick="openRecheck()" hidden><span>Recheck<small>Discipline committee</small></span></button>
+  </div>
+  <div id="loggedWrap"></div>
+  <div class="sp"></div>
+  <div class="foot"><span id="meLine"></span><span><button onclick="changeMe()">not you?</button> · <button onclick="signOut()">sign out</button></span></div>
+</section>
+
+<section class="pane" id="pCheck">
+  <h2>Grooming check</h2>
+  <div class="duo" style="margin-top:12px"><div class="field"><label for="cls">Class</label><select id="cls" onchange="loadClass()"></select></div>
+  <div class="field"><label for="date">Date</label><input id="date" type="date" onchange="loadClass()"></div></div>
+  <p class="state" id="clsState"></p>
+  <div class="msg" id="mCheck"></div>
+  <div id="rows"></div>
+  <div class="bar"><button class="btn" id="btnSubmit" onclick="submitCheck()">Submit</button></div>
+</section>
+
+<section class="pane" id="pFind">
+  <h2>Log an offence</h2>
+  <p class="lede">Find the student.</p>
+  <div class="search"><input id="findQ" placeholder="Type part of a name" oninput="paintFind()" autocomplete="off" autocapitalize="characters"></div>
+  <div id="findList" style="margin-top:8px"></div>
+</section>
+
+<section class="pane" id="pOff">
+  <h2 id="offName"></h2>
+  <p class="lede" id="offCls"></p>
+  <div class="msg" id="mOff"></div>
+  <p class="lab" style="margin:0 0 8px">What happened</p>
+  <div class="types" id="types"></div>
+  <div id="offCats" class="cats" style="margin-bottom:14px" hidden></div>
+  <div class="field"><label for="offDate">Date</label><input id="offDate" type="date"></div>
+  <div class="field"><label for="offRem">Remark <span id="remReq"></span></label><textarea id="offRem" maxlength="300"></textarea></div>
+  <p class="note">Keep it brief. If it involves anything sensitive, log the offence here and speak to the DM directly — don't describe it here.</p>
+  <div class="sp"></div>
+  <button class="btn" id="btnOff" onclick="saveOffence()">Log it</button>
+</section>
+
+<section class="pane" id="pRecheck">
+  <h2>Recheck</h2>
+  <p class="state" id="reState"></p>
+  <div class="msg" id="mRe"></div>
+  <div class="search"><input id="reQ" placeholder="Find a student" oninput="paintRecheck()" autocomplete="off"></div>
+  <div id="reList" style="margin-top:6px"></div>
+  <p class="note" style="margin-top:16px">Ending the recheck (everyone left becomes "did not report") is done in the Discipline app.</p>
+</section>
+
+<section class="pane" id="pDone">
+  <div class="stamp"><i><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></i><p id="doneHead">Submitted</p></div>
+  <p class="lede" id="doneText" style="text-align:center"></p>
+  <div class="sp"></div>
+  <div class="menu"><button class="btn" id="doneAgain"></button><button class="btn quiet" onclick="show('pHome')">Done</button></div>
+</section>
+
+<script>
+var API = 'https://script.google.com/macros/s/AKfycbz30kSEhCeopfnuJRxQav7tOUP-iRTTOFpfWrmZJPTZfX1KMdJQtGIAH7s5_7eqTw67dA/exec';   // ← the web app address (Deploy → Manage deployments → Web app URL), the same one as the gate page
+
+var LS = { get: function (k, d) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+           set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } },
+           del: function (k) { try { localStorage.removeItem(k); } catch (e) { } } };
+var SS = { get: function (k, d) { try { var v = sessionStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+           set: function (k, v) { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch (e) { } } };
+var device = LS.get('tch.device', ''); if (!device) { device = 'T' + Math.random().toString(36).slice(2, 8).toUpperCase(); LS.set('tch.device', device); }
+var S = { token: SS.get('tch.token', ''), role: SS.get('tch.role', ''), names: SS.get('tch.names', []), lists: SS.get('tch.lists', {}), me: LS.get('tch.me', ''),
+          marks: {}, others: [], submitted: [], open: null, student: null, type: null, codes: [], re: null };
+
+function $(id) { return document.getElementById(id); }
+function today() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function say(id, t, kind) { var el = $(id); if (!el) return; el.textContent = t || ''; el.className = 'msg' + (kind ? ' ' + kind : ''); }
+function dayShort(iso) { var d = new Date(iso + 'T00:00:00'); return d.toLocaleDateString('en-SG', { weekday: 'short', day: 'numeric', month: 'short' }); }
+function hhmm(iso) { var d = new Date(iso); return isNaN(d) ? '' : d.toLocaleTimeString('en-SG', { hour: 'numeric', minute: '2-digit' }); }
+function uid() { return device + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+/* drafts of unsent marks: this phone only, cleared the next day */
+(function () { try { Object.keys(localStorage).forEach(function (k) { if (k.indexOf('tch.draft.') === 0 && k.slice(10, 20) < today()) localStorage.removeItem(k); }); } catch (e) { } })();
+
+function post(action, body) {
+  body = body || {}; body.action = action; if (S.token) body.token = S.token;
+  return fetch(API, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body), redirect: 'follow' })
+    .then(function (r) { return r.json(); })
+    .then(function (j) { setConn(true); if (j && j.signedOut) signOut(true); return j; }, function (e) { setConn(false); throw e; });
+}
+function setConn(on) { var c = $('conn'); c.className = 'conn' + (on ? '' : ' off'); c.querySelector('span').textContent = on ? 'Connected' : 'No signal'; }
+
+var screen = 'pLogin', trail = [];
+function show(id, keep) {
+  if (screen !== id && keep !== false && ['pHome', 'pLogin', 'pDone', 'pWho'].indexOf(id) < 0) trail.push(screen);
+  if (['pHome', 'pLogin', 'pDone'].indexOf(id) >= 0) trail = [];
+  document.querySelectorAll('.pane').forEach(function (p) { p.classList.toggle('on', p.id === id); });
+  screen = id; $('back').hidden = ['pHome', 'pLogin', 'pDone'].indexOf(id) >= 0 || (id === 'pWho' && !S.me);
+  window.scrollTo(0, 0);
+  if (id === 'pHome') paintHome();
+}
+function goBack() {
+  if (screen === 'pCheck' && dirty() && !confirm('Leave without submitting? Your marks stay on this phone until you come back to this class.')) return;
+  var to = trail.pop() || 'pHome'; show(to, false);
+}
+
+/* ---------- sign in, who you are ---------- */
+function doLogin() {
+  if (!API) return say('mLogin', 'This page has not been connected to the Google script yet.', 'bad');
+  var pw = $('pw').value; if (!pw) return;
+  $('btnLogin').disabled = true; say('mLogin', '');
+  post('login', { role: 'teacher', password: pw }).then(function (j) {
+    $('btnLogin').disabled = false;
+    if (!j.ok) return say('mLogin', j.error, 'bad');
+    S.token = j.token; S.role = j.role; S.names = j.names || []; S.lists = j.lists || {};
+    SS.set('tch.token', S.token); SS.set('tch.role', S.role); SS.set('tch.names', S.names); SS.set('tch.lists', S.lists);
+    $('pw').value = '';
+    if (!S.me || (S.lists.teachers || []).indexOf(S.me) < 0) { S.me = ''; show('pWho'); paintWho(); } else show('pHome');
+  }, function () { $('btnLogin').disabled = false; say('mLogin', 'No signal. Try again when you are connected.', 'bad'); });
+}
+function signOut(expired) {
+  S.token = ''; try { sessionStorage.clear(); } catch (e) { }
+  show('pLogin'); if (expired) say('mLogin', 'Signed out — sign in again.', 'bad');
+}
+function paintWho() {
+  var q = $('whoQ').value.trim().toLowerCase(), t = (S.lists.teachers || []).filter(function (n) { return !q || n.toLowerCase().indexOf(q) >= 0; });
+  $('whoList').innerHTML = t.slice(0, 60).map(function (n) { return '<button class="pick" data-n="' + esc(n) + '">' + esc(n) + '</button>'; }).join('') || '<p class="lede">No teacher by that name. The list comes from the discipline committee.</p>';
+  $('whoList').querySelectorAll('[data-n]').forEach(function (b) { b.onclick = function () { S.me = b.dataset.n; LS.set('tch.me', S.me); show('pHome'); }; });
+}
+function changeMe() { $('whoQ').value = ''; show('pWho'); paintWho(); }
+function paintHome() {
+  $('hello').textContent = S.me; $('meLine').textContent = S.me + (S.role === 'dc' ? ' · discipline committee' : '');
+  $('btnRe').hidden = S.role !== 'dc';
+  var mine = LS.get('tch.logged', []).filter(function (x) { return x.at.slice(0, 10) === today(); });
+  $('loggedWrap').innerHTML = mine.length ? '<p class="eyebrow">Logged on this phone today</p>' + mine.slice().reverse().map(function (x) {
+    var canUndo = !x.undone && Date.now() - Date.parse(x.at) < 15 * 60000;
+    return '<div class="rec"><div><b>' + esc(x.name) + '</b><span>' + esc(x.cls) + ' · ' + esc(x.what) + (x.undone ? ' · undone' : '') + '</span></div>' + (canUndo ? '<button class="link" data-u="' + esc(x.id) + '">Undo</button>' : '') + '</div>';
+  }).join('') : '';
+  $('loggedWrap').querySelectorAll('[data-u]').forEach(function (b) { b.onclick = function () { undoOffence(b.dataset.u); }; });
+}
+
+/* ---------- names and lists ---------- */
+function byId(id) { for (var i = 0; i < S.names.length; i++) if (S.names[i][0] === id) return S.names[i]; return null; }
+function classes() { var c = {}; S.names.forEach(function (n) { c[n[2]] = 1; }); return Object.keys(c).sort(); }
+function catLabel(c, sex) { var s = String(sex || '').toUpperCase().charAt(0); return s === 'M' ? c.boys : s === 'F' ? c.girls : (c.name || c.boys || c.girls); }
+function catsFor(sex, atChecks) { return (S.lists.cats || []).filter(function (c) { return (!atChecks || c.atChecks) && catLabel(c, sex); }); }
+function catName(code) { var c = (S.lists.cats || []).filter(function (x) { return x.code === code; })[0]; return c ? c.name : code; }
+function othersCode() { var c = (S.lists.cats || []).filter(function (x) { return x.others; })[0]; return c ? c.code : 'C8'; }
+
+/* ---------- grooming check ---------- */
+function draftKey() { return 'tch.draft.' + $('date').value + '|' + $('cls').value; }
+function dirty() { return Object.keys(S.marks).some(function (k) { var m = S.marks[k]; return m.codes.length || m.absent; }) && !S.synced; }
+function openCheck() {
+  var cl = classes(), last = LS.get('tch.cls', '');
+  $('cls').innerHTML = cl.map(function (c) { return '<option' + (c === last ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('');
+  if (!$('date').value) $('date').value = today();
+  $('date').max = today();
+  show('pCheck'); loadClass();
+}
+function loadClass() {
+  LS.set('tch.cls', $('cls').value);
+  S.open = null; S.others = []; S.submitted = []; S.synced = false;
+  var d = LS.get(draftKey(), null); S.marks = d || {}; S.fromDraft = !!d;
+  say('mCheck', ''); paintClass();
+  $('clsState').textContent = 'Loading…';
+  post('myCheck', { cls: $('cls').value, date: $('date').value, teacher: S.me }).then(function (j) {
+    if (!j.ok) { $('clsState').textContent = ''; return say('mCheck', j.error, 'bad'); }
+    S.others = j.others || []; S.submitted = j.submitted || [];
+    if (!S.fromDraft) { S.marks = {}; (j.mine || []).forEach(function (m) { S.marks[m.sid] = { codes: m.codes, absent: m.absent, remark: m.remark || '' }; }); S.synced = (j.mine || []).length > 0; }
+    paintClass();
+  }, function () { $('clsState').textContent = 'No signal: marks are kept on this phone until you submit.'; });
+}
+function studentsOf(cls) { return S.names.filter(function (n) { return n[2] === cls; }).sort(function (a, b) { return (+a[3] || 999) - (+b[3] || 999) || (a[1] < b[1] ? -1 : 1); }); }
+function paintClass() {
+  var cls = $('cls').value, studs = studentsOf(cls), oc = othersCode();
+  var sub = S.submitted.map(function (x) { return (x.teacher === S.me ? 'You' : x.teacher) + ' at ' + hhmm(x.at) + (x.collected ? ' (with the committee)' : ''); });
+  var gone = S.submitted.some(function (x) { return x.teacher === S.me && x.collected; });
+  $('clsState').textContent = (sub.length ? 'Submitted: ' + sub.join(', ') + '. ' : 'Not submitted yet. ') +
+    (gone ? 'Your earlier marks are already with the discipline committee and are not shown here. Anything you mark now is added to them; to remove an earlier mark, tell the committee.' : 'Tap a student to mark them; everyone not marked has passed.');
+  $('rows').innerHTML = studs.map(function (n) {
+    var sid = n[0], m = S.marks[sid] || { codes: [], absent: false, remark: '' }, open = S.open === sid;
+    var oth = S.others.filter(function (o) { return o.sid === sid; }).map(function (o) { return o.teacher + ': ' + (o.absent ? 'absent' : catName(o.code)); });
+    var sum = m.absent ? '<span class="sum abs">Absent</span>' : m.codes.length ? '<span class="sum">' + m.codes.map(function (c) { return esc(catName(c)); }).join(', ') + '</span>' : '';
+    var h = '<div class="row' + (open ? ' open' : '') + '"><button data-s="' + esc(sid) + '"><span class="sn">' + esc(n[3]) + '</span><span class="nm">' + esc(n[1]) + sum + (oth.length ? '<span class="oth">' + esc(oth.join(' · ')) + '</span>' : '') + '</span></button>';
+    if (open) {
+      h += '<div class="cats">' + catsFor(n[4], true).map(function (c) { return '<button class="cat" data-c="' + esc(c.code) + '" aria-pressed="' + (m.codes.indexOf(c.code) >= 0) + '">' + esc(catLabel(c, n[4])) + '</button>'; }).join('') +
+        '<button class="cat abs" data-abs="1" aria-pressed="' + !!m.absent + '">Absent</button></div>' +
+        (m.codes.indexOf(oc) >= 0 ? '<input class="rem" id="remark" placeholder="Others: say what it was" value="' + esc(m.remark) + '" maxlength="200">' : '');
+    }
+    return h + '</div>';
+  }).join('') || '<p class="lede">No students in this class.</p>';
+  $('rows').querySelectorAll('[data-s]').forEach(function (b) { b.onclick = function () { S.open = S.open === b.dataset.s ? null : b.dataset.s; paintClass(); var r = $('rows').querySelector('.row.open'); if (r) r.scrollIntoView({ block: 'nearest' }); }; });
+  $('rows').querySelectorAll('[data-c]').forEach(function (b) { b.onclick = function () { toggle(S.open, b.dataset.c); }; });
+  $('rows').querySelectorAll('[data-abs]').forEach(function (b) { b.onclick = function () { var m = mk(S.open); m.absent = !m.absent; if (m.absent) m.codes = []; changed(); }; });
+  var r = $('remark'); if (r) r.oninput = function () { mk(S.open).remark = r.value; LS.set(draftKey(), S.marks); };
+  var n = 0, f = 0, a = 0; Object.keys(S.marks).forEach(function (k) { var m = S.marks[k]; if (m.absent) a++; else if (m.codes.length) { n++; f += m.codes.length; } });
+  $('btnSubmit').textContent = 'Submit ' + cls + ' · ' + (n || a ? n + ' student' + (n === 1 ? '' : 's') + ', ' + f + ' fail' + (f === 1 ? '' : 's') + (a ? ', ' + a + ' absent' : '') : 'everyone passed');
+}
+function mk(sid) { return S.marks[sid] || (S.marks[sid] = { codes: [], absent: false, remark: '' }); }
+function toggle(sid, code) { var m = mk(sid), i = m.codes.indexOf(code); if (i >= 0) m.codes.splice(i, 1); else { m.codes.push(code); m.absent = false; } changed(); }
+function changed() { S.synced = false; LS.set(draftKey(), S.marks); paintClass(); }
+function submitCheck() {
+  var oc = othersCode(), cls = $('cls').value, date = $('date').value;
+  var bad = Object.keys(S.marks).filter(function (k) { var m = S.marks[k]; return !m.absent && m.codes.indexOf(oc) >= 0 && !String(m.remark || '').trim(); });
+  if (bad.length) { S.open = bad[0]; paintClass(); return say('mCheck', 'Others needs a remark: say what it was.', 'bad'); }
+  var marks = Object.keys(S.marks).map(function (k) { var m = S.marks[k]; return { sid: k, codes: m.absent ? [] : m.codes, absent: !!m.absent, remark: m.remark || '' }; }).filter(function (m) { return m.absent || m.codes.length; });
+  $('btnSubmit').disabled = true; say('mCheck', '');
+  post('check', { cls: cls, date: date, teacher: S.me, device: device, marks: marks, othersCode: oc }).then(function (j) {
+    $('btnSubmit').disabled = false;
+    if (!j.ok) return say('mCheck', j.error, 'bad');
+    LS.del(draftKey()); S.synced = true;
+    $('doneHead').textContent = 'Submitted';
+    $('doneText').textContent = cls + ', ' + dayShort(date) + ', by ' + S.me + '. ' + j.fails + ' fail' + (j.fails === 1 ? '' : 's') + (j.absent ? ', ' + j.absent + ' absent' : '') + '. Spotted a mistake? Open the class again, fix it and submit: it replaces this one.';
+    $('doneAgain').textContent = 'Check another class'; $('doneAgain').onclick = function () { show('pCheck'); var o = $('cls'); if (o.selectedIndex < o.options.length - 1) o.selectedIndex++; loadClass(); };
+    show('pDone');
+  }, function () { $('btnSubmit').disabled = false; say('mCheck', 'No signal. Your marks are kept on this phone; press Submit again when you are connected.', 'bad'); });
+}
+
+/* ---------- log an offence ---------- */
+function openFind() { $('findQ').value = ''; paintFind(); show('pFind'); setTimeout(function () { $('findQ').focus(); }, 50); }
+function paintFind() {
+  var q = $('findQ').value.trim().toUpperCase(), words = q.split(/\s+/).filter(Boolean);
+  var hits = words.length ? S.names.filter(function (n) { var s = (n[1] + ' ' + n[2]).toUpperCase(); return words.every(function (w) { return s.indexOf(w) >= 0; }); }).slice(0, 40) : [];
+  $('findList').innerHTML = hits.map(function (n) { return '<button class="pick" data-s="' + esc(n[0]) + '">' + esc(n[1]) + '<span>' + esc(n[2]) + '</span></button>'; }).join('') || (words.length ? '<p class="lede">Nobody by that name.</p>' : '');
+  $('findList').querySelectorAll('[data-s]').forEach(function (b) { b.onclick = function () { openOffence(byId(b.dataset.s)); }; });
+}
+function openOffence(n) {
+  S.student = n; S.type = null; S.codes = [];
+  $('offName').textContent = n[1]; $('offCls').textContent = n[2];
+  $('offDate').value = today(); $('offDate').max = today(); $('offRem').value = ''; say('mOff', '');
+  var types = (S.lists.offences || []).concat([{ code: '__GROOM', label: 'Grooming and attire', remark: false }]);
+  $('types').innerHTML = types.map(function (t) { return '<button class="type" data-t="' + esc(t.code) + '" aria-pressed="false">' + esc(t.label) + '</button>'; }).join('');
+  $('types').querySelectorAll('[data-t]').forEach(function (b) { b.onclick = function () { S.type = b.dataset.t; S.codes = []; paintOffence(); }; });
+  paintOffence(); show('pOff');
+}
+function paintOffence() {
+  var n = S.student, g = S.type === '__GROOM', t = (S.lists.offences || []).filter(function (x) { return x.code === S.type; })[0];
+  $('types').querySelectorAll('[data-t]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.t === S.type); });
+  $('offCats').hidden = !g;
+  if (g) {
+    $('offCats').innerHTML = catsFor(n[4], false).map(function (c) { return '<button class="cat" data-c="' + esc(c.code) + '" aria-pressed="' + (S.codes.indexOf(c.code) >= 0) + '">' + esc(catLabel(c, n[4])) + '</button>'; }).join('');
+    $('offCats').querySelectorAll('[data-c]').forEach(function (b) { b.onclick = function () { var i = S.codes.indexOf(b.dataset.c); if (i >= 0) S.codes.splice(i, 1); else S.codes.push(b.dataset.c); paintOffence(); }; });
+  }
+  var need = (t && t.remark) || (g && S.codes.indexOf(othersCode()) >= 0);
+  $('remReq').textContent = need ? '(required)' : '(optional)';
+}
+function saveOffence() {
+  var n = S.student, g = S.type === '__GROOM', t = (S.lists.offences || []).filter(function (x) { return x.code === S.type; })[0], rem = $('offRem').value.trim();
+  if (!S.type) return say('mOff', 'Choose what happened.', 'bad');
+  if (g && !S.codes.length) return say('mOff', 'Choose at least one grooming or attire item.', 'bad');
+  if (((t && t.remark) || (g && S.codes.indexOf(othersCode()) >= 0)) && !rem) return say('mOff', 'This one needs a remark.', 'bad');
+  var id = uid(), what = g ? S.codes.map(catName).join(', ') : t.label;
+  $('btnOff').disabled = true; say('mOff', '');
+  post('offence', { id: id, sid: n[0], cls: n[2], date: $('offDate').value, teacher: S.me, device: device, kind: g ? 'groom' : 'offence', code: g ? '' : S.type, codes: g ? S.codes : [], remark: rem }).then(function (j) {
+    $('btnOff').disabled = false;
+    if (!j.ok) return say('mOff', j.error, 'bad');
+    var L = LS.get('tch.logged', []).filter(function (x) { return x.at.slice(0, 10) === today(); }); L.push({ id: id, name: n[1], cls: n[2], what: what, at: new Date().toISOString() }); LS.set('tch.logged', L);
+    $('doneHead').textContent = 'Logged'; $('doneText').textContent = n[1] + ', ' + n[2] + ': ' + what + '. You can undo it from the first screen for 15 minutes.';
+    $('doneAgain').textContent = 'Log another'; $('doneAgain').onclick = openFind;
+    show('pDone');
+  }, function () { $('btnOff').disabled = false; say('mOff', 'No signal. Nothing was sent; try again when you are connected.', 'bad'); });
+}
+function undoOffence(id) {
+  if (!confirm('Undo this?')) return;
+  post('undoOffence', { id: id, device: device }).then(function (j) {
+    if (!j.ok) return say('mHome', j.error, 'bad');
+    var L = LS.get('tch.logged', []); L.forEach(function (x) { if (x.id === id) x.undone = true; }); LS.set('tch.logged', L); say('mHome', 'Undone.', 'good'); paintHome();
+  }, function () { say('mHome', 'No signal. Try again when you are connected.', 'bad'); });
+}
+
+/* ---------- recheck (discipline committee) ---------- */
+function openRecheck() { $('reQ').value = ''; show('pRecheck'); loadRecheck(); }
+function loadRecheck() {
+  $('reState').textContent = 'Loading…'; say('mRe', '');
+  post('recheckList', {}).then(function (j) {
+    if (!j.ok) { $('reState').textContent = ''; return say('mRe', j.error, 'bad'); }
+    S.re = j; paintRecheck();
+  }, function () { $('reState').textContent = ''; say('mRe', 'No signal.', 'bad'); });
+}
+function paintRecheck() {
+  var R = S.re; if (!R) return;
+  if (!R.open) { $('reState').textContent = ''; $('reList').innerHTML = ''; return say('mRe', 'No recheck is open today. Start one in the Discipline app (Grooming › Start a recheck) and it appears here.'); }
+  var mark = {}; R.marks.forEach(function (m) { mark[m.sid + '|' + m.code] = m; });
+  var by = {}; R.items.forEach(function (i) { (by[i.sid] = by[i.sid] || []).push(i); });
+  var q = $('reQ').value.trim().toUpperCase(), sids = Object.keys(by).filter(function (sid) { var n = byId(sid); return n && (!q || (n[1] + ' ' + n[2]).toUpperCase().indexOf(q) >= 0); })
+    .sort(function (a, b) { var x = byId(a), y = byId(b); return x[2] < y[2] ? -1 : x[2] > y[2] ? 1 : (+x[3] || 0) - (+y[3] || 0); });
+  var seen = Object.keys(by).filter(function (sid) { return by[sid].every(function (i) { return mark[sid + '|' + i.code]; }); }).length;
+  $('reState').textContent = dayShort(R.date) + (R.level && R.level !== 'All' ? ' · ' + R.level : '') + ' · seen ' + seen + ' of ' + Object.keys(by).length;
+  $('reList').innerHTML = sids.map(function (sid) {
+    var n = byId(sid);
+    return '<div class="stu"><b>' + esc(n[1]) + '</b><span>' + esc(n[2]) + '</span>' + by[sid].map(function (i) {
+      var m = mark[sid + '|' + i.code], c = (S.lists.cats || []).filter(function (x) { return x.code === i.code; })[0];
+      return '<div class="ri"><div class="what">' + esc(c ? catLabel(c, n[4]) : i.code) + '<span>since ' + dayShort(i.since) + '</span></div><div class="seg"><button data-r="fixed" data-k="' + esc(sid + '|' + i.code) + '" aria-pressed="' + (!!m && m.result === 'fixed') + '">Fixed</button><button data-r="notfixed" data-k="' + esc(sid + '|' + i.code) + '" aria-pressed="' + (!!m && m.result === 'notfixed') + '">Not fixed</button></div></div>';
+    }).join('') + '</div>';
+  }).join('') || '<p class="lede">' + (q ? 'Nobody by that name on the list.' : 'Nobody has anything open.') + '</p>';
+  $('reList').querySelectorAll('[data-r]').forEach(function (b) { b.onclick = function () {
+    var k = b.dataset.k.split('|'), r = b.dataset.r;
+    S.re.marks = S.re.marks.filter(function (m) { return !(m.sid === k[0] && m.code === k[1]); }).concat([{ sid: k[0], code: k[1], result: r, teacher: S.me }]); paintRecheck();
+    post('recheck', { sid: k[0], code: k[1], result: r, teacher: S.me, device: device }).then(function (j) { if (!j.ok) { say('mRe', j.error, 'bad'); loadRecheck(); } }, function () { say('mRe', 'No signal: that mark was not sent. Tap it again when you are connected.', 'bad'); });
+  }; });
+}
+
+/* ---------- start ---------- */
+if (S.token && S.names.length) { if (S.me) show('pHome'); else { show('pWho'); paintWho(); } }
+</script>
+</body>
+</html>
